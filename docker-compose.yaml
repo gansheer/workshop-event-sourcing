@@ -1,0 +1,7 @@
+version: "2"
+services:
+  postgres:
+    image: ylegat/workshop-event-sourcing:latest
+    ports:
+      - "5432:5432"
+    container_name: postgres
