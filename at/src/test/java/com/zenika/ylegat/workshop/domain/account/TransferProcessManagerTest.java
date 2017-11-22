@@ -7,45 +7,65 @@ public class TransferProcessManagerTest extends AbstractBankAccountTesting {
     @Test
     public void should_finalize_transfer() {
         // Given
-        /**
-         * given:
-         * 1. a transfer process manager registered with the event bus (the event bus is accessible from the superclass)
-         * 2. a bank account ("origin") registered and provisioned with 1 credit
-         * 3. a bank account ("destination") registered
-         */
+        TransferProcessManager transferProcessManager = new TransferProcessManager(eventStore);
+        eventBus.register(transferProcessManager);
+
+        BankAccount bankAccountDestination = new BankAccount(eventStore);
+        bankAccountDestination.registerBankAccount("bankAccountDestinationId");
+
+        BankAccount bankAccountOrigin = new BankAccount(eventStore);
+        bankAccountOrigin.registerBankAccount("bankAccountOriginId");
+        bankAccountOrigin.provisionCredit(1);
 
         // When
-        /**
-         * when a transfer is initialized from "origin" to "destination"
-         */
+        String transferId = bankAccountOrigin.initializeTransfer("bankAccountDestinationId", 1);
 
         // Then
-        /**
-         * Then:
-         * 1. "origin" events should contains exactly 1 BankAccountRegistered, 1 CreditProvisioned, 1 TransferInitialized and 1 TransferFinalized
-         * 2. "destinations" events should contains exactly 1 BankAccountRegistered and TransferReceived
-         */
+        assertThatEvents("bankAccountOriginId").containsExactly(new BankAccountRegistered("bankAccountOriginId"),
+                                                                new CreditProvisioned("bankAccountOriginId", 1, 1),
+                                                                new TransferInitialized("bankAccountOriginId",
+                                                                                        transferId,
+                                                                                        "bankAccountDestinationId",
+                                                                                        1,
+                                                                                        0),
+                                                                new TransferFinalized("bankAccountOriginId",
+                                                                                      transferId,
+                                                                                      "bankAccountDestinationId"));
+
+        assertThatEvents("bankAccountDestinationId").containsExactly(new BankAccountRegistered("bankAccountDestinationId"),
+                                                                     new TransferReceived("bankAccountDestinationId",
+                                                                                          transferId,
+                                                                                          "bankAccountOriginId",
+                                                                                          1,
+                                                                                          1));
     }
 
     @Test
     public void should_cancel_transfer() {
         // Given
-        /**
-         * given:
-         * 1. a transfer process manager registered with the event bus (the event bus is accessible from the superclass)
-         * 2. a bank account ("origin") registered and provisioned with 1 credit
-         */
+        TransferProcessManager transferProcessManager = new TransferProcessManager(eventStore);
+        eventBus.register(transferProcessManager);
+
+        BankAccount bankAccountOrigin = new BankAccount(eventStore);
+        bankAccountOrigin.registerBankAccount("bankAccountOriginId");
+        bankAccountOrigin.provisionCredit(1);
 
         // When
-        /**
-         * when a transfer is initialized from "origin" to a non registered bank account id
-         */
+        String transferId = bankAccountOrigin.initializeTransfer("bankAccountDestinationId", 1);
 
         // Then
-        /**
-         * Then:
-         * 1. "origin" events should contains exactly 1 BankAccountRegistered, 1 CreditProvisioned, 1 TransferInitialized and 1 TransferCanceled
-         */
+        assertThatEvents("bankAccountOriginId").containsExactly(new BankAccountRegistered("bankAccountOriginId"),
+                                                                new CreditProvisioned("bankAccountOriginId", 1, 1),
+                                                                new TransferInitialized("bankAccountOriginId",
+                                                                                        transferId,
+                                                                                        "bankAccountDestinationId",
+                                                                                        1,
+                                                                                        0),
+                                                                new TransferCanceled("bankAccountOriginId",
+                                                                                     transferId,
+                                                                                     "bankAccountDestinationId",
+                                                                                     1,
+                                                                                     1));
     }
 
 }

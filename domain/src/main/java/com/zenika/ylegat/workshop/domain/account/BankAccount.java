@@ -2,6 +2,7 @@ package com.zenika.ylegat.workshop.domain.account;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.UUID.randomUUID;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,48 +106,73 @@ public class BankAccount {
 
     @DecisionFunction
     public String initializeTransfer(String bankAccountDestinationId, int creditToTransfer) {
-        /**
-         * 1. throw an InvalidCommandException if the bank destination id is the same that this id
-         * 2. throw an InvalidCommandException if the balance is lower then the credit amount to transfer
-         * 3. instantiate a TransferInitialized event
-         * 4. save the event in the event store (eventStore.save(...))
-         * 5. load the new event from the event store (eventStore.load(id, version + 1))
-         * 6. apply the loaded event (eventProcessor.on(event))
-         */
+        if (bankAccountDestinationId.equals(id)) {
+            logger.info("cannot transfer {} credit to same account {}", creditToTransfer, bankAccountDestinationId);
+            throw new InvalidCommandException();
+        }
 
-        return null;
+        int newCreditBalance = creditBalance - creditToTransfer;
+        if (newCreditBalance < 0) {
+            logger.info("not enough credit ({}) to transfer {}", creditBalance, creditToTransfer);
+            throw new InvalidCommandException();
+        }
+
+        String transferId = randomUUID().toString();
+        eventStore.save(version, new TransferInitialized(id,
+                                                         transferId,
+                                                         bankAccountDestinationId,
+                                                         creditToTransfer,
+                                                         newCreditBalance));
+        eventStore.load(id, version + 1)
+                  .forEach(eventProcessor::on);
+
+        return transferId;
     }
 
     @DecisionFunction
     public void receiveTransfer(String bankAccountOriginId, String transferId, int creditTransferred) {
-        /**
-         * 1. instantiate a TransferReceived event
-         * 2. save the event in the event store (eventStore.save(...))
-         * 3. load the new event from the event store (eventStore.load(id, version + 1))
-         * 4. apply the loaded event (eventProcessor.on(event))
-         */
+        eventStore.save(version, new TransferReceived(id,
+                                                      transferId,
+                                                      bankAccountOriginId,
+                                                      creditTransferred,
+                                                      creditBalance + creditTransferred));
+
+        eventStore.load(id, version + 1)
+                  .forEach(eventProcessor::on);
     }
 
     @DecisionFunction
     public void finalizeTransfer(String transferId) {
-        /**
-         * 1. throw an InvalidCommandException if the transfer id is absent from the pending transfer map
-         * 2. instantiate a TransferFinalized event
-         * 3. save the event in the event store (eventStore.save(...))
-         * 4. load the new event from the event store (eventStore.load(id, version + 1))
-         * 5. apply the loaded event (eventProcessor.on(event))
-         */
+        TransferInitialized transferInitialized = pendingTransfers.get(transferId);
+        if (transferInitialized == null) {
+            logger.info("transfer designed by id {} has not been initialized or was already finalized", transferId);
+            throw new InvalidCommandException();
+        }
+
+        eventStore.save(version, new TransferFinalized(id,
+                                                       transferId,
+                                                       transferInitialized.bankAccountIdDestination));
+
+        eventStore.load(id, version + 1)
+                  .forEach(eventProcessor::on);
     }
 
     @DecisionFunction
     public void cancelTransfer(String transferId) {
-        /**
-         * 1. throw an InvalidCommandException if the transfer id is absent from the pending transfer map
-         * 2. instantiate a TransferCanceled event
-         * 3. save the event in the event store (eventStore.save(...))
-         * 4. load the new event from the event store (eventStore.load(id, version + 1))
-         * 5. apply the loaded event (eventProcessor.on(event))
-         */
+        if (!pendingTransfers.containsKey(transferId)) {
+            logger.info("transfer designed by id {} has not been initialized or was already finalized", transferId);
+            throw new InvalidCommandException();
+        }
+
+        TransferInitialized transferInitialized = pendingTransfers.get(transferId);
+        eventStore.save(version, new TransferCanceled(id,
+                                                      transferId,
+                                                      transferInitialized.bankAccountIdDestination,
+                                                      transferInitialized.creditTransferred,
+                                                      creditBalance + transferInitialized.creditTransferred));
+
+        eventStore.load(id, version + 1)
+                  .forEach(eventProcessor::on);
     }
 
     @Override
@@ -204,35 +230,27 @@ public class BankAccount {
         @Override
         @EvolutionFunction
         public void on(TransferInitialized transferInitialized) {
-            /**
-             * 1. affect the event's new credit balance to this credit balance
-             * 2. add the event to the pending transfers map
-             */
+            creditBalance = transferInitialized.newCreditBalance;
+            pendingTransfers.put(transferInitialized.transferId, transferInitialized);
         }
 
         @Override
         @EvolutionFunction
         public void on(TransferReceived transferReceived) {
-            /**
-             * 1. affect the event's new credit balance to this credit balance
-             */
+            creditBalance = transferReceived.newCreditBalance;
         }
 
         @Override
         @EvolutionFunction
         public void on(TransferFinalized transferFinalized) {
-            /**
-             * 1. remove the event from the pending transfers map
-             */
+            pendingTransfers.remove(transferFinalized.transferId);
         }
 
         @Override
         @EvolutionFunction
         public void on(TransferCanceled transferCanceled) {
-            /**
-             * 1. affect the event's new credit balance to this credit balance
-             * 2. remove the event from the pending transfers map
-             */
+            pendingTransfers.remove(transferCanceled.transferId);
+            creditBalance = transferCanceled.newCreditBalance;
         }
     }
 

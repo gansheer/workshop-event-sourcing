@@ -1,71 +1,71 @@
 package com.zenika.ylegat.workshop.domain.account;
 
+import static java.util.Collections.singletonMap;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import org.junit.Test;
+import com.zenika.ylegat.workshop.domain.common.InvalidCommandException;
 
 public class BankAccount_transferInitializedTest extends AbstractBankAccountTesting {
 
     @Test
     public void should_fail_initializing_transfer_when_destination_is_same_than_initializer() {
         // Given
-        /**
-         * Given a bank account registered with 1 credit
-         */
+        BankAccount bankAccountOrigin = new BankAccount(eventStore);
+        bankAccountOrigin.registerBankAccount("bankAccountOriginId");
 
         // When
-        /**
-         * when a transfer of 1 credit is initialized (BankAccount.initializeTransfer) at the same destination than the origin account
-         */
+        Throwable invalidCommandException = catchThrowable(() -> bankAccountOrigin.initializeTransfer("bankAccountOriginId",
+                                                                                                      1));
 
         // Then
-        /**
-         * then assert that:
-         * 1. the command throws an invalidCommandException exception
-         * 2. the events associated to the account only contains one BankAccountRegistered event
-         */
+        assertThat(invalidCommandException).isInstanceOf(InvalidCommandException.class);
+        assertThatEvents("bankAccountOriginId").containsExactly(new BankAccountRegistered("bankAccountOriginId"));
     }
 
     @Test
     public void should_fail_initializing_transfer_when_credit_to_transfer_greater_than_available_credit() {
         // Given
-        /**
-         * Given a bank account registered with 0 credit
-         */
+        BankAccount bankAccountOrigin = new BankAccount(eventStore);
+        bankAccountOrigin.registerBankAccount("bankAccountOriginId");
 
         // When
-        /**
-         * when a transfer of 1 credit is initialized (BankAccount.initializeTransfer) at destination of another bank account
-         */
+        Throwable invalidCommandException = catchThrowable(() -> bankAccountOrigin.initializeTransfer("bankAccountDestinationId",
+                                                                                                      1));
 
         // Then
-        /**
-         * then assert that:
-         * 1. the command throws an invalidCommandException exception
-         * 2. the events associated to the account only contains one BankAccountRegistered event
-         */
+        assertThat(invalidCommandException).isInstanceOf(InvalidCommandException.class);
+        assertThatEvents("bankAccountOriginId").containsExactly(new BankAccountRegistered("bankAccountOriginId"));
     }
 
     @Test
     public void should_initialize_transfer() {
         // Given
-        /**
-         * Given a bank account registered and provisionoined with 1 credit
-         */
+        BankAccount bankAccountOrigin = new BankAccount(eventStore);
+        bankAccountOrigin.registerBankAccount("bankAccountOriginId");
+        bankAccountOrigin.provisionCredit(1);
 
         // When
-        /**
-         * when a transfer of 1 credit is initialized (BankAccount.initializeTransfer) at destination of another bank account
-         */
+        String transferId = bankAccountOrigin.initializeTransfer("bankAccountDestinationId", 1);
 
         // Then
-        /**
-         * then assert that:
-         * 1. the transfer id returned by the command is not null
-         * 2. the events associated to the account only contains a BankAccountRegistered, followed by a CreditProvisioned followed by a TransferInitialized event
-         * 3. the state of the bank account is:
-         * * 0 credit
-         * * a version of 3
-         * * a pending event map containing the transfer initialized event
-         */
+        assertThat(transferId).isNotNull();
+
+        TransferInitialized transferInitialized = new TransferInitialized("bankAccountOriginId",
+                                                                          transferId,
+                                                                          "bankAccountDestinationId",
+                                                                          1,
+                                                                          0);
+
+        assertThatEvents("bankAccountOriginId").containsExactly(new BankAccountRegistered("bankAccountOriginId"),
+                                                                new CreditProvisioned("bankAccountOriginId", 1, 1),
+                                                                transferInitialized);
+
+        assertThat(bankAccountOrigin).isEqualTo(new BankAccount("bankAccountOriginId",
+                                                                eventStore,
+                                                                0,
+                                                                3,
+                                                                singletonMap(transferId, transferInitialized)));
     }
 
 }
