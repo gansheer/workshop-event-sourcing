@@ -15,6 +15,7 @@ import com.zenika.ylegat.workshop.domain.common.Event;
 import com.zenika.ylegat.workshop.domain.common.EventListener;
 import com.zenika.ylegat.workshop.domain.common.EventStore;
 import com.zenika.ylegat.workshop.domain.common.EvolutionFunction;
+import com.zenika.ylegat.workshop.domain.common.InvalidCommandException;
 
 public class BankAccount {
 
@@ -77,33 +78,29 @@ public class BankAccount {
 
     @DecisionFunction
     public void registerBankAccount(String bankAccountId) {
-        /**
-         * 1. instantiate a BankAccountRegisteredEvent event
-         * 2. save the event in the event store (eventStore.save(...))
-         * 3. load the new event from the event store (eventStore.load(id, version + 1))
-         * 4. apply the loaded event (eventProcessor.on(event))
-         */
+        eventStore.save(version, new BankAccountRegistered(bankAccountId));
+        eventStore.load(bankAccountId).forEach(eventProcessor::on);
     }
 
     @DecisionFunction
     public void provisionCredit(int creditToProvision) {
-        /**
-         * 1. instantiate a CreditProvisioned event
-         * 2. save the event in the event store (eventStore.save(...))
-         * 3. load the new event from the event store (eventStore.load(id, version + 1))
-         * 4. apply the loaded event (eventProcessor.on(event))
-         */
+        eventStore.save(version, new CreditProvisioned(id, creditToProvision, creditBalance + creditToProvision));
+
+        eventStore.load(id, version + 1)
+                  .forEach(eventProcessor::on);
     }
 
     @DecisionFunction
     public void withdrawCredit(int creditToWithdraw) {
-        /**
-         * 1. throw an InvalidCommandException if the balance is lower then the credit amount to withdraw
-         * 2. instantiate a CreditWithdrawn event
-         * 3. save the event in the event store (eventStore.save(...))
-         * 4. load the new event from the event store (eventStore.load(id, version + 1))
-         * 5. apply the loaded event (eventProcessor.on(event))
-         */
+        int newCreditBalance = creditBalance - creditToWithdraw;
+        if (newCreditBalance < 0) {
+            logger.info("not enough credit ({}) to withdraw {}", creditBalance, creditToWithdraw);
+            throw new InvalidCommandException();
+        }
+
+        eventStore.save(version, new CreditWithdrawn(id, creditToWithdraw, newCreditBalance));
+        eventStore.load(id, version + 1)
+                  .forEach(eventProcessor::on);
     }
 
     @DecisionFunction
@@ -189,25 +186,19 @@ public class BankAccount {
         @Override
         @EvolutionFunction
         public void on(BankAccountRegistered bankAccountRegistered) {
-            /**
-             * 1. affect the event's aggregate id to this id
-             */
+            id = bankAccountRegistered.aggregateId;
         }
 
         @Override
         @EvolutionFunction
         public void on(CreditProvisioned creditProvisioned) {
-            /**
-             * 1. affect the event's new credit balance to this credit balance
-             */
+            creditBalance = creditProvisioned.newCreditBalance;
         }
 
         @Override
         @EvolutionFunction
         public void on(CreditWithdrawn creditWithdrawn) {
-            /**
-             * 1. affect the event's new credit balance to this credit balance
-             */
+            creditBalance = creditWithdrawn.newCreditBalance;
         }
 
         @Override

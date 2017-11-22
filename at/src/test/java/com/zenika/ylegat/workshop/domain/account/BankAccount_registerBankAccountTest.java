@@ -10,37 +10,28 @@ public class BankAccount_registerBankAccountTest extends AbstractBankAccountTest
     @Test
     public void should_register_bank_account_with_success() {
         // When
-        /**
-         * when bank account is registered (instantiate a bank account and call BankAccount.registerBankAccount)
-         */
+        BankAccount bankAccount = new BankAccount(eventStore);
+        bankAccount.registerBankAccount("bankAccountId");
 
         // Then
-        /**
-         * 1. assert that the events associated to the bank account contains exactly one BankAccountRegistered event (use assertThatEvents method defined in the superclass)
-         * 2. assert on the state of the bank account (you can use Assertion.assertThat(actualBankAccount).isEqualTo(expectedBankAccount)) :
-         * * it's id should be identical to the one created
-         * * its credit should be equal to 0
-         * * its version should be 1 (one event has been applied on the bank account)
-         */
+        assertThatEvents("bankAccountId").containsExactly(new BankAccountRegistered("bankAccountId"));
+
+        assertThat(bankAccount).isEqualTo(new BankAccount("bankAccountId", eventStore, 0, 1));
     }
 
     @Test
     public void should_fail_registering_bank_account_with_already_used_id() {
         // Given
-        /**
-         * Given a bank account registered (instantiate a bank account and call BankAccount.registerBankAccount)
-         */
+        BankAccount bankAccount = new BankAccount(eventStore);
+        bankAccount.registerBankAccount("bankAccountId");
 
         // When
-        /**
-         * When a bank account with the same id is registered (use Assertions.catchThrowable(() -> call_registerBankAccount_here() to catch the exception)
-         */
+        BankAccount bankAccountConflicting = new BankAccount(eventStore);
+        Throwable conflictingEventException = catchThrowable(() -> bankAccountConflicting.registerBankAccount("bankAccountId"));
 
         // Then
-        /**
-         * 1. assert that the command thrown a ConflictingEventException exception
-         * 2. assert that the events associated to the bank account contains exactly one BankAccountRegistered event
-         */
+        assertThat(conflictingEventException).isInstanceOf(ConflictingEventException.class);
+        assertThatEvents("bankAccountId").containsExactly(new BankAccountRegistered("bankAccountId"));
     }
 
 }
