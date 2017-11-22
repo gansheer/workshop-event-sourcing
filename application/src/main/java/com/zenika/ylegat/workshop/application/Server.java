@@ -27,15 +27,16 @@ public class Server {
     private final CreditBalanceRepository totalCreditRepository;
 
     public Server() {
-        /**
-         * 1. instantiate a PostgresCreditBalanceRepository instance
-         * 2. clear the repository
-         * 3. instantiate a GuavaEventBus
-         * 4. instantiate a PostgresEventStore
-         * 5. clear the event store
-         * 6. register a TransferProcessManager with the event bus
-         * 7. register a CreditBalanceProjectionManager with the event bus
-         */
+        totalCreditRepository = new PostgresCreditBalanceRepository();
+        totalCreditRepository.clear();
+
+        GuavaEventBus eventBus = new GuavaEventBus();
+
+        eventStore = new PostgresEventStore(eventBus);
+        eventStore.clear();
+
+        eventBus.register(new TransferProcessManager(eventStore));
+        eventBus.register(new CreditBalanceProjectionManager(totalCreditRepository));
 
         /*
         http POST localhost:8080/account/account_1
