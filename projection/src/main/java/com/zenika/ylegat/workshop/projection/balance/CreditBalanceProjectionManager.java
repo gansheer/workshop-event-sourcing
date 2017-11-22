@@ -18,37 +18,27 @@ public class CreditBalanceProjectionManager implements ProjectionManager {
 
     @Override
     public void on(BankAccountRegistered bankAccountRegistered) {
-        /**
-         * update the balance of read model using creditBalanceRepository
-         */
+        creditBalanceRepository.writeCreditBalance(bankAccountRegistered.aggregateId, 0);
     }
 
     @Override
     public void on(CreditProvisioned creditProvisioned) {
-        /**
-         * update the balance of read model using creditBalanceRepository
-         */
+        creditBalanceRepository.writeCreditBalance(creditProvisioned.aggregateId, creditProvisioned.newCreditBalance);
     }
 
     @Override
     public void on(CreditWithdrawn creditWithdrawn) {
-        /**
-         * update the balance of read model using creditBalanceRepository
-         */
+        creditBalanceRepository.writeCreditBalance(creditWithdrawn.aggregateId, creditWithdrawn.newCreditBalance);
     }
 
     @Override
     public void on(TransferInitialized transferInitialized) {
-        /**
-         * update the balance of read model using creditBalanceRepository
-         */
+        creditBalanceRepository.writeCreditBalance(transferInitialized.aggregateId, transferInitialized.newCreditBalance);
     }
 
     @Override
     public void on(TransferReceived transferReceived) {
-        /**
-         * update the balance of read model using creditBalanceRepository
-         */
+        creditBalanceRepository.writeCreditBalance(transferReceived.aggregateId, transferReceived.newCreditBalance);
     }
 
     @Override
@@ -58,9 +48,7 @@ public class CreditBalanceProjectionManager implements ProjectionManager {
 
     @Override
     public void on(TransferCanceled transferCanceled) {
-        /**
-         * update the balance of read model using creditBalanceRepository
-         */
-
+        creditBalanceRepository.writeCreditBalance(transferCanceled.aggregateId, transferCanceled.newCreditBalance);
     }
+
 }
