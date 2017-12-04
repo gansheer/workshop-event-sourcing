@@ -1,3 +1,15 @@
+**init**
+https://hub.docker.com/r/ylegat/workshop-event-sourcing/~/dockerfile/
+Voici la commande qui vous permettra de lancer votre conteneur :
+```
+docker run -it --name postgres -p 5432:5432 ylegat/workshop-event-sourcing:latest
+```
+Voici la commande qui vous permettra de vérifier la bonne exécution du conteneur (le retour de cette commande devrait être "accepting connections") :
+```
+docker exec postgres pg_isready
+```
+
+
 **step 0: init workshop**
 ```
 git checkout step0/init-workshop
